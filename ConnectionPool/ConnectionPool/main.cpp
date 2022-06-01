@@ -1,4 +1,4 @@
-﻿#define _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
 #include"Mysqlconn.h"
 #include <iostream>
 #include<iostream>
@@ -32,6 +32,7 @@ void op2(ConnectionPoll* pool,int begin, int end) {
     }
 }
 //测试函数
+//单线程
 void test1() {
 #if 0
 
@@ -49,23 +50,68 @@ void test1() {
     op2(pool,0, 5000);
     steady_clock::time_point end = steady_clock::now();
     auto length = end - begin;
-    cout << "用连接池，单线程，用时：" << length.count() << "纳秒，"
+    std::cout << "用连接池，单线程，用时：" << length.count() << "纳秒，"
         << length.count() / 1000000 << "毫秒" << endl;
 #endif
 }
 
+//多线程
+void test2() {
+#if 0
+    //非连接池，多线程，用时：12645346200纳秒，12645毫秒
+    //通过额外的连接   解决由于相同的用户名和密码会出现问题  避免  
+    // 0x00007FFB4D63355C (libmysql.dll)处
+    // (位于 ConnectionPool.exe 中)引发的异常: 0xC0000005: 
+    //读取位置 0x00000000000003D8 时发生访问冲突
+    Mysqlconn conn;
+    conn.connect("root", "671520", "demo", "127.0.0.1");
+    steady_clock::time_point begin = steady_clock::now();
+    thread t1(op1, 0, 1000);
+    thread t2(op1, 1000, 2000);
+    thread t3(op1, 2000, 3000);
+    thread t4(op1, 3000, 4000);
+    thread t5(op1, 4000, 5000);
+    t1.join();
+    t2.join();
+    t3.join();
+    t4.join();
+    t5.join();
+    steady_clock::time_point end = steady_clock::now();
+    auto length = end - begin;
+    std::cout << "非连接池，多线程，用时：" << length.count() << "纳秒，"
+        << length.count() / 1000000 << "毫秒" << endl;
+#else
+    //用连接池，多线程，用时：959476200纳秒，959毫秒
+    ConnectionPoll* pool = ConnectionPoll::getConnectionPoll();
+    steady_clock::time_point begin = steady_clock::now();
+    thread t1(op2, pool,0, 1000);
+    thread t2(op2, pool,1000, 2000);
+    thread t3(op2, pool,2000, 3000);
+    thread t4(op2, pool,3000, 4000);
+    thread t5(op2, pool,4000, 5000);
+    t1.join();
+    t2.join();
+    t3.join();
+    t4.join();
+    t5.join();
+    steady_clock::time_point end = steady_clock::now();
+    auto length = end - begin;
+    std::cout << "用连接池，多线程，用时：" << length.count() << "纳秒，"
+        << length.count() / 1000000 << "毫秒" << endl;
+#endif
+}
 int query() {
     Mysqlconn conn;
     conn.connect("root", "671520", "demo", "127.0.0.1");
 
     string sql="insert into student values(6,11230105,'琪琪','女','2022-5-31 21:07:06')";
     bool flag=conn.update(sql);
-    cout << "flag value:" << flag << endl;
+    std::cout << "flag value:" << flag << endl;
     sql = "select * from student";
     conn.query(sql);//得出结果集
     while (conn.next()) {
         //取字段
-        cout << conn.value(0) << ","
+        std::cout << conn.value(0) << ","
             << conn.value(1) << ","
             << conn.value(2) << ","
             << conn.value(3) << ","
@@ -77,7 +123,7 @@ int main()
 {
     //query();
     //std::cout << "Hello World!\n";
-    test1();
+    test2();
     return 0;
 }
 
